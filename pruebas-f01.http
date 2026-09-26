@@ -1,0 +1,192 @@
+# =============================================================================
+# SIGCA-EPQ · Pruebas de F-01 Registrar usuario
+# Ejecutar en orden, con la aplicación corriendo en localhost:8080.
+# Copiar este archivo a la raíz del proyecto (junto al pom.xml).
+# Si repites las pruebas, los registros exitosos darán 409 (ya existen):
+# cambia el documento y el correo, o borra los datos con  DELETE FROM usuario; COMMIT;
+# =============================================================================
+
+### 1. Tipos de documento
+# Esperado: 200 con CC, CE, PA y NIT
+GET http://localhost:8080/api/tipos-documento
+
+
+### 2. Persona natural con cédula
+# Esperado: 201, estado "ACTIVO"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1094123456",
+  "nombres": "María Camila",
+  "apellidos": "Gómez Rojas",
+  "email": "maria@correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 3. Persona jurídica con NIT
+# Esperado: 201, estado "PENDIENTE_VALIDACION" (el NIT no se valida ante la RNEC)
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "NIT",
+  "numeroDocumento": "900123456",
+  "razonSocial": "Ferretería El Roble S.A.S.",
+  "email": "contacto@elroble.com",
+  "telefono": "6067412345",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 4. Documento duplicado (repite la prueba 2 con otro correo)
+# Esperado: 409 "Ya existe un usuario registrado con ese documento"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1094123456",
+  "nombres": "María Camila",
+  "apellidos": "Gómez Rojas",
+  "email": "otro@correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 5. Correo duplicado (otro documento, mismo correo con mayúsculas)
+# Esperado: 409 "Ese correo electrónico ya está registrado"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1094999999",
+  "nombres": "Pedro",
+  "apellidos": "Ruiz",
+  "email": "MARIA@Correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 6. Identidad no validada (cédula de solo ceros, simulación)
+# Esperado: 422 "No fue posible validar su identidad ante la Registraduría"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "0000000000",
+  "nombres": "Prueba",
+  "apellidos": "Rechazo",
+  "email": "rechazo@correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 7. Formulario con varios datos inválidos
+# Esperado: 400 con el detalle por campo en "errores"
+# (correo, teléfono, contraseña y aceptación de datos)
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1094111111",
+  "nombres": "Ana",
+  "apellidos": "Torres",
+  "email": "correo-sin-arroba",
+  "telefono": "123",
+  "password": "corta",
+  "confirmarPassword": "corta",
+  "aceptaTratamientoDatos": false
+}
+
+
+### 8. Contraseñas distintas
+# Esperado: 400 "Las contraseñas no coinciden"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1094222222",
+  "nombres": "Ana",
+  "apellidos": "Torres",
+  "email": "ana@correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2027",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 9. Persona natural que envía razón social
+# Esperado: 400 "Para persona natural no debe indicar razón social"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "1094333333",
+  "nombres": "Ana",
+  "apellidos": "Torres",
+  "razonSocial": "Mi Empresa",
+  "email": "ana2@correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 10. Persona jurídica que envía nombres
+# Esperado: 400 "Para persona jurídica no debe indicar nombres ni apellidos"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "NIT",
+  "numeroDocumento": "900777888",
+  "razonSocial": "Distribuidora Andina S.A.S.",
+  "nombres": "Carlos",
+  "email": "andina@correo.com",
+  "telefono": "6067412345",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}
+
+
+### 11. Tipo de documento inexistente
+# Esperado: 400 "Tipo de documento no válido"
+POST http://localhost:8080/api/usuarios
+Content-Type: application/json
+
+{
+  "tipoDocumento": "XYZ",
+  "numeroDocumento": "1094444444",
+  "nombres": "Ana",
+  "apellidos": "Torres",
+  "email": "ana3@correo.com",
+  "telefono": "3001234567",
+  "password": "Clave2026",
+  "confirmarPassword": "Clave2026",
+  "aceptaTratamientoDatos": true
+}

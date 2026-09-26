@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+
+:root {
+  --agua: #0E5A75;
+  --agua-oscuro: #093F53;
+  --pizarra: #14262E;
+  --niebla: #EEF3F4;
+  --linea: #C9D6DA;
+  --error: #B3261E;
+  --ok: #1B6E45;
+  --foco: #E3A008;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--niebla); color: var(--pizarra);
+  font-family: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif; font-size: 1rem;
+}

@@ -1,0 +1,94 @@
+<main class="portal">
+  <aside class="panel">
+    <p class="marca">EPQ</p>
+    <h1>Cree su cuenta para gestionar sus servicios</h1>
+    <p>Con su cuenta podrá consultar sus facturas, pagar en línea y radicar peticiones, quejas y reclamos sin ir a una oficina.</p>
+  </aside>
+
+  <section class="contenido">
+    @if (registrado(); as r) {
+      <div class="exito" role="status">
+        <h2>Registro recibido</h2>
+        <p>{{ r.nombre }}, su cuenta quedó creada con el correo <strong>{{ r.email }}</strong>.</p>
+        @if (r.estado === 'ACTIVO') {
+          <p>Su identidad fue validada y su cuenta está activa.</p>
+        } @else {
+          <p>Su identidad queda pendiente de validación por EPQ. Su cuenta se activará cuando termine ese proceso.</p>
+        }
+        <button type="button" class="secundario" (click)="nuevoRegistro()">Registrar otra cuenta</button>
+      </div>
+    } @else {
+      <form [formGroup]="form" (ngSubmit)="enviar()" novalidate>
+        <h2>Registro de usuario</h2>
+
+        @if (errorCarga()) {
+          <p class="alerta" role="alert">No se pudieron cargar los tipos de documento. Verifique que el servidor esté en ejecución y recargue la página.</p>
+        }
+
+        <!-- Campo de texto reutilizable -->
+        <ng-template #campo let-nombre="nombre" let-etiqueta="etiqueta" let-tipo="tipo" let-auto="auto">
+          <div class="campo">
+            <label [for]="nombre">{{ etiqueta }}</label>
+            <input [id]="nombre" [type]="tipo" [formControlName]="nombre"
+                   [attr.autocomplete]="auto" [attr.aria-invalid]="error(nombre) ? true : null" />
+            @if (error(nombre); as msg) { <p class="error">{{ msg }}</p> }
+          </div>
+        </ng-template>
+
+        <fieldset>
+          <legend>Identificación</legend>
+          <div class="campo">
+            <label for="tipoDocumento">Tipo de documento</label>
+            <select id="tipoDocumento" formControlName="tipoDocumento" [attr.aria-invalid]="error('tipoDocumento') ? true : null">
+              <option value="" disabled>Seleccione una opción</option>
+              @for (t of tipos(); track t.codigo) {
+                <option [value]="t.codigo">{{ t.nombre }} ({{ t.codigo }})</option>
+              }
+            </select>
+            @if (error('tipoDocumento'); as msg) { <p class="error">{{ msg }}</p> }
+          </div>
+          <ng-container *ngTemplateOutlet="campo; context: { nombre: 'numeroDocumento', etiqueta: 'Número de documento', tipo: 'text' }" />
+
+          @if (tipoPersona() === 'NATURAL') {
+            <div class="fila">
+              <ng-container *ngTemplateOutlet="campo; context: { nombre: 'nombres', etiqueta: 'Nombres', tipo: 'text', auto: 'given-name' }" />
+              <ng-container *ngTemplateOutlet="campo; context: { nombre: 'apellidos', etiqueta: 'Apellidos', tipo: 'text', auto: 'family-name' }" />
+            </div>
+          }
+          @if (tipoPersona() === 'JURIDICA') {
+            <ng-container *ngTemplateOutlet="campo; context: { nombre: 'razonSocial', etiqueta: 'Razón social', tipo: 'text', auto: 'organization' }" />
+          }
+        </fieldset>
+
+        <fieldset>
+          <legend>Contacto</legend>
+          <div class="fila">
+            <ng-container *ngTemplateOutlet="campo; context: { nombre: 'email', etiqueta: 'Correo electrónico', tipo: 'email', auto: 'email' }" />
+            <ng-container *ngTemplateOutlet="campo; context: { nombre: 'telefono', etiqueta: 'Teléfono', tipo: 'tel', auto: 'tel' }" />
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Acceso a su cuenta</legend>
+          <div class="fila">
+            <ng-container *ngTemplateOutlet="campo; context: { nombre: 'password', etiqueta: 'Contraseña', tipo: 'password', auto: 'new-password' }" />
+            <ng-container *ngTemplateOutlet="campo; context: { nombre: 'confirmarPassword', etiqueta: 'Confirmar contraseña', tipo: 'password', auto: 'new-password' }" />
+          </div>
+          <p class="ayuda">Mínimo 8 caracteres, con letras y números.</p>
+        </fieldset>
+
+        <div class="campo autorizacion">
+          <label class="check">
+            <input type="checkbox" formControlName="aceptaTratamientoDatos" />
+            <span>Autorizo el tratamiento de mis datos personales conforme a la Ley 1581 de 2012.</span>
+          </label>
+          @if (error('aceptaTratamientoDatos'); as msg) { <p class="error">{{ msg }}</p> }
+        </div>
+
+        @if (errorGeneral(); as msg) { <p class="alerta" role="alert">{{ msg }}</p> }
+
+        <button type="submit" [disabled]="enviando()">{{ enviando() ? 'Creando cuenta…' : 'Crear cuenta' }}</button>
+      </form>
+    }
+  </section>
+</main>

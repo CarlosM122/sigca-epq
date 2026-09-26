@@ -1,0 +1,29 @@
+# ---------- Java / Maven (backend/) ----------
+backend/target/
+*.class
+*.jar
+*.log
+
+# ---------- Angular / Node (frontend/) ----------
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+npm-debug.log*
+
+# ---------- IDE ----------
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Datos sensibles ----------
+# Si en algún momento crea un archivo con contraseñas reales (por ejemplo
+# application-local.properties), agréguelo aquí para que nunca se suba.
+application-local.properties
+*.env
