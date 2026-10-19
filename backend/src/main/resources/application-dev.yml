@@ -1,0 +1,30 @@
+# Perfil de desarrollo local con Oracle Free en Docker (ver docker-compose.yml en la raíz).
+# NUNCA usar estos secretos fuera de un equipo de desarrollo.
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521/FREEPDB1
+    username: SIGCA_APP
+    password: SigcaApp2026x
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true
+
+sigca:
+  seguridad:
+    jwt-secret: dev-solo-local-0123456789abcdef0123456789abcdef
+    cors-origenes: http://localhost:4200
+  cifrado:
+    clave-aes: ZGV2LXNvbG8tbG9jYWwtYWVzLTI1Ni0zMmJ5dGVzISE=
+    clave-hmac: ZGV2LXNvbG8tbG9jYWwtaG1hYy0yNTYtMzJieXRlcyE=
+  portal:
+    url-base: http://localhost:4200
+  integraciones:
+    pasarela:
+      secreto-webhook: dev-solo-local-webhook-0123456789abcdef
+
+logging:
+  level:
+    co.gov.epq.sigca: DEBUG

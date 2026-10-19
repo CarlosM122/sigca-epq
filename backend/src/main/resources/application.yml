@@ -1,0 +1,94 @@
+# Configuración base de SIGCA-EPQ. Los secretos llegan por variables de entorno; los valores
+# por defecto solo sirven para el perfil "dev" (ver application-dev.yml).
+spring:
+  application:
+    name: sigca-epq
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${SIGCA_DB_URL}
+    username: ${SIGCA_DB_USUARIO:SIGCA_APP}
+    password: ${SIGCA_DB_CLAVE}
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      # El esquema lo instalan los scripts de /modelo-datos/sql; Hibernate solo verifica que coincida.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: SIGCA
+        jdbc:
+          batch_size: 50
+          time_zone: America/Bogota
+        order_inserts: true
+        order_updates: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 52MB
+  jackson:
+    default-property-inclusion: non_null
+  mail:
+    host: ${SIGCA_SMTP_HOST:localhost}
+    port: ${SIGCA_SMTP_PUERTO:587}
+    username: ${SIGCA_SMTP_USUARIO:}
+    password: ${SIGCA_SMTP_CLAVE:}
+
+server:
+  port: 8080
+  error:
+    include-stacktrace: never
+    include-message: never
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+sigca:
+  seguridad:
+    jwt-secret: ${SIGCA_JWT_SECRETO}
+    duracion-acceso: 15m
+    duracion-renovacion: 8h
+    cors-origenes: ${SIGCA_CORS_ORIGENES:https://sigca.epq.gov.co}
+    emisor-doble-factor: EPQ SIGCA
+  cifrado:
+    # 32 bytes en Base64 cada una: openssl rand -base64 32
+    clave-aes: ${SIGCA_CLAVE_AES}
+    clave-hmac: ${SIGCA_CLAVE_HMAC}
+  portal:
+    url-base: ${SIGCA_URL_PORTAL:https://sigca.epq.gov.co}
+  integraciones:
+    pasarela:
+      modo: ${SIGCA_PASARELA_MODO:simulado}
+      url-checkout: ${SIGCA_PASARELA_URL:/api/publico/pasarela-simulada}
+      secreto-webhook: ${SIGCA_PASARELA_SECRETO}
+    rnec:
+      modo: simulado
+    erp:
+      modo: simulado
+    sms:
+      modo: simulado
+    correo:
+      modo: ${SIGCA_CORREO_MODO:simulado}
+      remitente: ${SIGCA_CORREO_REMITENTE:no-responder@epq.gov.co}
+
+logging:
+  level:
+    root: INFO
+    co.gov.epq.sigca: INFO
