@@ -29,6 +29,7 @@ import co.gov.epq.sigca.usuarios.Usuario;
 @Transactional(readOnly = true)
 public class Obligaciones {
 
+    /** Formato de la referencia de pago (P-18); lo usa la validación de {@link PagoController.PagoRequest}. */
     public static final String PATRON_REFERENCIA = "^(FAC-\\d{6}-\\d{7}|AP-\\d{4}-\\d{6}(-\\d{2})?)$";
     private static final Pattern FACTURA = Pattern.compile("^FAC-\\d{6}-\\d{7}$");
     private static final Pattern ACUERDO = Pattern.compile("^(AP-\\d{4}-\\d{6})(?:-(\\d{2}))?$");

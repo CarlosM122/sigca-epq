@@ -62,9 +62,7 @@ public class PagoEnLineaService {
             // No se revela si la obligación existe
             throw new RecursoNoEncontradoException(tipo == TipoObligacion.FACTURA ? "Factura" : "Cuota", obligacionId);
         }
-        if (!o.admitePago()) {
-            throw new ConflictoException("NO_ADMITE_PAGOS", o.motivoNoAdmite());
-        }
+        o.exigirAdmitePago();
         Optional<TransaccionPasarela> abierta = tipo == TipoObligacion.FACTURA
                 ? transacciones.findFirstByFacturaIdAndEstado(o.id(), EstadoTransaccion.INICIADA)
                 : transacciones.findFirstByCuotaIdAndEstado(o.id(), EstadoTransaccion.INICIADA);
