@@ -40,10 +40,12 @@ public class PagoController {
 
     private final PagoService servicio;
     private final Obligaciones obligaciones;
+    private final ComprobantePagoPdf comprobantes;
 
-    public PagoController(PagoService servicio, Obligaciones obligaciones) {
+    public PagoController(PagoService servicio, Obligaciones obligaciones, ComprobantePagoPdf comprobantes) {
         this.servicio = servicio;
         this.obligaciones = obligaciones;
+        this.comprobantes = comprobantes;
     }
 
     /** Lo que se va a pagar con una referencia: total, valor en reclamo y valor exigible. */
@@ -83,7 +85,8 @@ public class PagoController {
     @GetMapping(value = "/{id}/comprobante", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyAuthority('PAGO_CONSULTAR','PAGO_REGISTRAR_PRESENCIAL')")
     public ResponseEntity<byte[]> comprobante(@PathVariable Long id) {
-        return pdf(servicio.obtener(id).getCodigoPago(), servicio.comprobante(id));
+        PagoVista v = servicio.detalle(id);
+        return pdf(v.codigoPago(), comprobantes.generar(v));
     }
 
     public static ResponseEntity<byte[]> pdf(String nombre, byte[] contenido) {
@@ -96,7 +99,8 @@ public class PagoController {
 
     public record PagoRequest(
             @NotBlank(message = "La referencia es obligatoria")
-            @Pattern(regexp = "^(?i)(FAC-\\d{6}-\\d{7}|AP-\\d{4}-\\d{6}(-\\d{2})?)$", message = "Referencia inválida (FAC-AAAAMM-NNNNNNN o AP-AAAA-NNNNNN[-NN])") String referencia,
+            @Pattern(regexp = Obligaciones.PATRON_REFERENCIA, flags = Pattern.Flag.CASE_INSENSITIVE,
+                    message = "Referencia inválida (FAC-AAAAMM-NNNNNNN o AP-AAAA-NNNNNN[-NN])") String referencia,
             @NotNull(message = "Indique el canal") CanalPago canal,
             @NotNull(message = "Indique el valor") @DecimalMin(value = "0.01", message = "El valor debe ser positivo")
             @Digits(integer = 12, fraction = 2, message = "Valor inválido") BigDecimal valor,

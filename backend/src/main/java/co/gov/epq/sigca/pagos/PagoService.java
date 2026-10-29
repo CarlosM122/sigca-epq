@@ -15,7 +15,6 @@ import co.gov.epq.sigca.auditoria.Auditoria;
 import co.gov.epq.sigca.auditoria.OperacionAuditoria;
 import co.gov.epq.sigca.cartera.AcuerdoPago;
 import co.gov.epq.sigca.cartera.CuotaAcuerdo;
-import co.gov.epq.sigca.common.error.ConflictoException;
 import co.gov.epq.sigca.common.error.NegocioException;
 import co.gov.epq.sigca.common.error.RecursoNoEncontradoException;
 import co.gov.epq.sigca.facturacion.DocumentoPdf;
@@ -23,8 +22,6 @@ import co.gov.epq.sigca.facturacion.EstadoSyncErp;
 import co.gov.epq.sigca.facturacion.Factura;
 import co.gov.epq.sigca.facturacion.FacturaRepository;
 import co.gov.epq.sigca.facturacion.FacturacionUsuariosRepository;
-import co.gov.epq.sigca.notificaciones.EventoNotificacion;
-import co.gov.epq.sigca.notificaciones.Notificaciones;
 import co.gov.epq.sigca.seguridad.UsuarioActual;
 import co.gov.epq.sigca.usuarios.Usuario;
 import jakarta.persistence.EntityManager;
@@ -32,7 +29,8 @@ import jakarta.persistence.EntityManager;
 /**
  * Registro y consulta de pagos (RF-06, CU-04). Sin abonos libres: se paga exactamente el valor exigible de la
  * factura o la cuota (P-05, CO-02); TRG_PAGO_BI lo vuelve a exigir y TRG_PAGO_AI salda líneas, factura, cuota,
- * acuerdo y ordena la reconexión (RN-36).
+ * acuerdo y ordena la reconexión (RN-36). El texto del correo lo redacta {@link AvisosPago} y el PDF del comprobante
+ * {@link ComprobantePagoPdf}.
  */
 @Service
 public class PagoService {
@@ -46,12 +44,12 @@ public class PagoService {
     private final PagosAcuerdosRepository acuerdos;
     private final FacturacionUsuariosRepository usuarios;
     private final Auditoria auditoria;
-    private final Notificaciones notificaciones;
+    private final AvisosPago avisos;
     private final EntityManager em;
 
     public PagoService(PagoRepository pagos, Obligaciones obligaciones, FacturaRepository facturas,
             PagosCuotasRepository cuotas, PagosAcuerdosRepository acuerdos, FacturacionUsuariosRepository usuarios,
-            Auditoria auditoria, Notificaciones notificaciones, EntityManager em) {
+            Auditoria auditoria, AvisosPago avisos, EntityManager em) {
         this.pagos = pagos;
         this.obligaciones = obligaciones;
         this.facturas = facturas;
@@ -59,7 +57,7 @@ public class PagoService {
         this.acuerdos = acuerdos;
         this.usuarios = usuarios;
         this.auditoria = auditoria;
-        this.notificaciones = notificaciones;
+        this.avisos = avisos;
         this.em = em;
     }
 
@@ -80,11 +78,12 @@ public class PagoService {
         return vista(p);
     }
 
-    /** Verifica antes de insertar que la obligación admite pago y que el valor es el exigible. */
-    public static void exigirPagable(Obligacion o, BigDecimal valor) {
-        if (!o.admitePago()) {
-            throw new ConflictoException("NO_ADMITE_PAGOS", o.motivoNoAdmite());
-        }
+    /**
+     * Verifica antes de insertar que la obligación admite pago (regla de {@link Obligacion}) y que el valor es
+     * exactamente el exigible: no se reciben abonos (P-05).
+     */
+    static void exigirPagable(Obligacion o, BigDecimal valor) {
+        o.exigirAdmitePago();
         if (valor == null || valor.compareTo(o.valorExigible()) != 0) {
             throw new NegocioException("VALOR_NO_COINCIDE", "El valor debe ser exactamente el valor exigible de "
                     + DocumentoPdf.pesos(o.valorExigible()) + " (no se reciben abonos, P-05)");
@@ -117,31 +116,25 @@ public class PagoService {
         p.setEstadoSyncErp(EstadoSyncErp.PENDIENTE);
         pagos.saveAndFlush(p);
         refrescarObligacion(o);
+        avisos.comprobante(p, o, u);
+        auditoria.exito(OperacionAuditoria.REGISTRAR_PAGO, "PAGO", p.getId(), detalleAuditoria(p, o));
+        return p;
+    }
 
-        notificaciones.correo(EventoNotificacion.COMPROBANTE_PAGO, u.getCorreo(), u.getId(),
-                "Comprobante de pago " + p.getCodigoPago(),
-                "Hola " + u.getNombreCompleto() + ",\n\nRecibimos su pago.\n"
-                        + "Comprobante: " + p.getCodigoPago() + "\n"
-                        + "Referencia pagada: " + o.referencia() + "\n"
-                        + "Valor: " + DocumentoPdf.pesos(p.getValor()) + "\n"
-                        + "Fecha: " + DocumentoPdf.fechaHora(p.getFechaPago()) + "\n"
-                        + "Canal: " + canal + (codigoTransaccion != null ? " (transacción " + codigoTransaccion + ")" : "")
-                        + "\n\nPuede descargar el comprobante en el portal de EPQ.\n",
-                "PAGO", p.getId());
-
+    /** Detalle del registro de auditoría; el orden de las claves es el que se guarda en LOG_AUDITORIA. */
+    static Map<String, Object> detalleAuditoria(Pago p, Obligacion o) {
         Map<String, Object> detalle = new LinkedHashMap<>();
         detalle.put("codigoPago", p.getCodigoPago());
         detalle.put("referencia", o.referencia());
         detalle.put("valor", p.getValor());
-        detalle.put("canal", canal);
-        if (codigoTransaccion != null) {
-            detalle.put("codigoTransaccion", codigoTransaccion);
+        detalle.put("canal", p.getCanalPago());
+        if (p.getCodigoTransaccion() != null) {
+            detalle.put("codigoTransaccion", p.getCodigoTransaccion());
         }
-        if (referenciaBanco != null) {
-            detalle.put("referenciaBanco", referenciaBanco);
+        if (p.getReferenciaBanco() != null) {
+            detalle.put("referenciaBanco", p.getReferenciaBanco());
         }
-        auditoria.exito(OperacionAuditoria.REGISTRAR_PAGO, "PAGO", p.getId(), detalle);
-        return p;
+        return detalle;
     }
 
     private void refrescarObligacion(Obligacion o) {
@@ -193,23 +186,6 @@ public class PagoService {
                 p.getValor(), p.getCanalPago(), p.getFechaPago(), p.getCodigoTransaccion(), p.getReferenciaBanco(),
                 c.getEstado().name() + " · acuerdo " + a.getEstado(), null, null,
                 Boolean.TRUE.equals(p.getComprobanteEnviado()));
-    }
-
-    /** Comprobante electrónico de pago (SWR-08). */
-    @Transactional(readOnly = true)
-    public byte[] comprobante(Long id) {
-        PagoVista v = detalle(id);
-        return DocumentoPdf.generar("Comprobante de pago " + v.codigoPago(), doc -> doc.add(DocumentoPdf.datos(
-                "Comprobante", v.codigoPago(),
-                "Fecha y hora", DocumentoPdf.fechaHora(v.fechaPago()),
-                "Titular", v.titular() + " (" + v.codigoUsuario() + ")",
-                "Referencia pagada", v.referencia(),
-                "Tipo", v.tipoObligacion() == TipoObligacion.FACTURA ? "Factura" : "Cuota de acuerdo de pago",
-                "Canal", v.canal().name(),
-                "Valor pagado", DocumentoPdf.pesos(v.valor()),
-                "Código de transacción", v.codigoTransaccion(),
-                "Referencia bancaria", v.referenciaBanco(),
-                "Estado de la obligación", v.estadoObligacion())));
     }
 
     static String mayus(String s) {
